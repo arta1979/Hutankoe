@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Peta Permohonan Hutan Desa</title>
+    <title>Dasbor Data Hutan Desa - Hutankoe</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
         .container { max-width: 1000px; margin: 0 auto; background: #fff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); overflow: hidden; }
@@ -15,6 +15,22 @@
         .image-section { text-align: center; margin-bottom: 30px; background: #ecf0f1; padding: 10px; border-radius: 8px; }
         .image-section img { max-width: 100%; height: auto; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         
+        /* Styling Menu Geser (Tabs) */
+        .tabs-container {
+            display: flex; overflow-x: auto; gap: 10px; padding-bottom: 15px;
+            margin-bottom: 10px; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+        }
+        .tabs-container::-webkit-scrollbar { display: none; }
+        
+        .tab-btn {
+            padding: 10px 20px; background-color: #ecf0f1; color: #333;
+            border: 1px solid #bdc3c7; border-radius: 20px; cursor: pointer;
+            font-weight: bold; white-space: nowrap; transition: all 0.3s ease;
+        }
+        .tab-btn:hover { background-color: #d1d8dd; }
+        .tab-btn.active { background-color: #2980b9; color: #fff; border-color: #2980b9; }
+
+        /* Styling Kartu & Tabel */
         .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
         .card h2 { margin-top: 0; font-size: 18px; color: #2980b9; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px; }
         ul { list-style-type: none; padding-left: 0; margin: 0; }
@@ -26,9 +42,8 @@
         
         .btn-map { background-color: #27ae60; color: white; text-decoration: none; padding: 6px 12px; border-radius: 4px; font-size: 12px; display: inline-block; }
         .btn-map:hover { background-color: #2ecc71; }
-        
-        /* Loading text */
         .loading { text-align: center; font-style: italic; color: #888; }
+        .error-msg { color: #c0392b; text-align: center; padding: 15px; background: #fadbd8; border-radius: 8px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -42,134 +57,187 @@
 
     <div class="content">
         <div class="image-section">
-            <!-- Gambar tetap dibaca dari folder -->
+            <!-- Pastikan gambar ada di folder 'gambar' dengan nama 'peta.jpg' -->
             <img src="gambar/peta.jpg" alt="Gambar Peta Permohonan">
             <p><em>Gambar Peta Permohonan</em></p>
         </div>
 
-        <!-- Tempat untuk Info Umum (Akan diisi dari CSV) -->
-        <div class="card">
-            <h2>Informasi Umum & Surat</h2>
-            <ul id="list-info"><li class="loading">Memuat data...</li></ul>
+        <div id="pesan-error"></div>
+
+        <!-- MENU GESER (Otomatis dari folder data) -->
+        <div class="tabs-container" id="menu-tabs">
+            <div class="loading" style="padding: 10px;">Memindai folder data...</div>
         </div>
 
-        <!-- Tempat untuk Tabel Koordinat (Akan diisi dari CSV) -->
-        <div class="card">
-            <h2>Daftar Koordinat Titik Lokasi</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>No</th>
-                        <th>Bujur</th>
-                        <th>Lintang</th>
-                        <th>Keterangan</th>
-                        <th>Aksi</th>
-                    </tr>
-                </thead>
-                <tbody id="tabel-koordinat">
-                    <tr><td colspan="5" class="loading">Memuat data...</td></tr>
-                </tbody>
-            </table>
-        </div>
+        <div id="konten-dashboard">
+            <div class="card">
+                <h2>Informasi Umum & Surat</h2>
+                <ul id="list-info"><li class="loading">Memuat data...</li></ul>
+            </div>
 
-        <!-- Tempat untuk Pengesahan (Akan diisi dari CSV) -->
-        <div class="card">
-            <h2>Lembar Pengesahan</h2>
-            <ul id="list-pengesahan"><li class="loading">Memuat data...</li></ul>
+            <div class="card">
+                <h2>Daftar Koordinat Titik Lokasi</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Bujur</th>
+                            <th>Lintang</th>
+                            <th>Keterangan</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabel-koordinat">
+                        <tr><td colspan="5" class="loading">Memuat data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <h2>Lembar Pengesahan</h2>
+                <ul id="list-pengesahan"><li class="loading">Memuat data...</li></ul>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- SCRIPT PARSER CSV & PEMBUAT TABEL OTOMATIS -->
 <script>
-    // Fungsi cerdas untuk membaca CSV, mengabaikan koma di dalam tanda kutip
+    // =====================================================
+    // KONFIGURASI OTOMATIS (Sesuai URL: arta1979.github.io/Hutankoe/)
+    // =====================================================
+    const GITHUB_USER = 'arta1979'; 
+    const GITHUB_REPO = 'Hutankoe'; 
+    const FOLDER_DATA = 'data';
+    // =====================================================
+
+    // --- FUNGSI PARSER CSV ---
     function parseCSV(text) {
-        let rows = [];
-        let currentRow = [];
-        let currentCell = '';
-        let insideQuote = false;
-
+        let rows = [], currentRow = [], currentCell = '', insideQuote = false;
         for (let i = 0; i < text.length; i++) {
-            let char = text[i];
-            let nextChar = text[i + 1];
-
+            let char = text[i], nextChar = text[i + 1];
             if (char === '"') {
-                if (insideQuote && nextChar === '"') { // Handle escaped quotes ""
-                    currentCell += '"';
-                    i++;
-                } else {
-                    insideQuote = !insideQuote;
-                }
+                if (insideQuote && nextChar === '"') { currentCell += '"'; i++; } 
+                else { insideQuote = !insideQuote; }
             } else if (char === ',' && !insideQuote) {
-                currentRow.push(currentCell.trim());
-                currentCell = '';
+                currentRow.push(currentCell.trim()); currentCell = '';
             } else if ((char === '\n' || char === '\r') && !insideQuote) {
                 if (currentCell !== '' || currentRow.length > 0) {
-                    currentRow.push(currentCell.trim());
-                    rows.push(currentRow);
-                    currentRow = [];
-                    currentCell = '';
+                    currentRow.push(currentCell.trim()); rows.push(currentRow);
+                    currentRow = []; currentCell = '';
                 }
-            } else {
-                currentCell += char;
-            }
+            } else { currentCell += char; }
         }
         if (currentCell !== '' || currentRow.length > 0) {
-            currentRow.push(currentCell.trim());
-            rows.push(currentRow);
+            currentRow.push(currentCell.trim()); rows.push(currentRow);
         }
         return rows;
     }
 
-    // Ambil data dari file CSV
-    fetch('data.csv')
-        .then(response => response.text())
-        .then(data => {
-            const rows = parseCSV(data);
-            
-            // Bersihkan teks loading
-            document.getElementById('list-info').innerHTML = '';
-            document.getElementById('tabel-koordinat').innerHTML = '';
-            document.getElementById('list-pengesahan').innerHTML = '';
+    // --- FUNGSI FORMAT NAMA TAB ---
+    function formatNamaTab(filename) {
+        return filename
+            .replace(/\.csv$/i, '')
+            .replace(/[_-]/g, ' ')
+            .replace(/\b\w/g, c => c.toUpperCase());
+    }
 
-            // Looping data (mulai dari i=1 untuk melewati header)
-            for (let i = 1; i < rows.length; i++) {
-                let row = rows[i];
-                if (row.length < 2 || row[0] === '') continue; // Lewati baris kosong
+    // --- FUNGSI MERENDER DATA CSV ---
+    function muatData(fileUrl) {
+        document.getElementById('list-info').innerHTML = '<li class="loading">Memuat data...</li>';
+        document.getElementById('tabel-koordinat').innerHTML = '<tr><td colspan="5" class="loading">Memuat data...</td></tr>';
+        document.getElementById('list-pengesahan').innerHTML = '<li class="loading">Memuat data...</li>';
 
-                let tipe = row[0];
-                let param = row[1];
-                let val1 = row[2] || '';
-                let val2 = row[3] || '';
-                let ket = row[4] || '';
+        fetch(fileUrl)
+            .then(response => response.text())
+            .then(data => {
+                const rows = parseCSV(data);
+                document.getElementById('list-info').innerHTML = '';
+                document.getElementById('tabel-koordinat').innerHTML = '';
+                document.getElementById('list-pengesahan').innerHTML = '';
 
-                if (tipe === 'Info') {
-                    document.getElementById('list-info').innerHTML += `<li><strong>${param}:</strong> ${val1}</li>`;
-                
-                } else if (tipe === 'Koordinat') {
-                    let linkMaps = `https://maps.google.com/maps?q=${val2},${val1}`;
-                    document.getElementById('tabel-koordinat').innerHTML += `
-                        <tr>
-                            <td>${param}</td>
-                            <td>${val1}</td>
-                            <td>${val2}</td>
-                            <td>${ket}</td>
-                            <td><a class="btn-map" href="${linkMaps}" target="_blank">Buka Maps</a></td>
-                        </tr>
-                    `;
-                
-                } else if (tipe === 'Pengesahan') {
-                    let nip = val2 ? ` (NIP: ${val2})` : '';
-                    document.getElementById('list-pengesahan').innerHTML += `<li><strong>${param}:</strong> ${val1}${nip}</li>`;
+                for (let i = 1; i < rows.length; i++) {
+                    let row = rows[i];
+                    if (row.length < 2 || row[0] === '') continue;
+                    let tipe = row[0], param = row[1], val1 = row[2] || '', val2 = row[3] || '', ket = row[4] || '';
+
+                    if (tipe === 'Info') {
+                        document.getElementById('list-info').innerHTML += `<li><strong>${param}:</strong> ${val1}</li>`;
+                    } else if (tipe === 'Koordinat') {
+                        let linkMaps = `https://maps.google.com/maps?q=${val2},${val1}`;
+                        document.getElementById('tabel-koordinat').innerHTML += `
+                            <tr>
+                                <td>${param}</td>
+                                <td>${val1}</td>
+                                <td>${val2}</td>
+                                <td>${ket}</td>
+                                <td><a class="btn-map" href="${linkMaps}" target="_blank">Buka Maps</a></td>
+                            </tr>`;
+                    } else if (tipe === 'Pengesahan') {
+                        let nip = val2 ? ` (NIP: ${val2})` : '';
+                        document.getElementById('list-pengesahan').innerHTML += `<li><strong>${param}:</strong> ${val1}${nip}</li>`;
+                    }
                 }
+            })
+            .catch(error => {
+                console.error('Gagal:', error);
+                document.getElementById('list-info').innerHTML = '<li style="color:red">Gagal memuat file CSV.</li>';
+            });
+    }
+
+    // --- FUNGSI MINTA DAFTAR FILE KE GITHUB API ---
+    async function pindaiFolderData() {
+        const container = document.getElementById('menu-tabs');
+        const pesanError = document.getElementById('pesan-error');
+
+        try {
+            const apiUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FOLDER_DATA}`;
+            const response = await fetch(apiUrl);
+
+            if (!response.ok) {
+                throw new Error(`Gagal akses API (Status: ${response.status}). Pastikan repository PUBLIC.`);
             }
-        })
-        .catch(error => {
-            console.error('Gagal memuat data.csv:', error);
-            document.getElementById('list-info').innerHTML = '<li style="color:red">Gagal memuat data CSV. Pastikan file data.csv ada.</li>';
-            document.getElementById('tabel-koordinat').innerHTML = '<tr><td colspan="5" style="color:red; text-align:center;">Gagal memuat data CSV.</td></tr>';
-            document.getElementById('list-pengesahan').innerHTML = '';
-        });
+
+            const files = await response.json();
+            const csvFiles = files.filter(f => f.name.toLowerCase().endsWith('.csv'));
+
+            if (csvFiles.length === 0) {
+                container.innerHTML = '<div class="loading" style="padding:10px;">Belum ada file .csv di folder data.</div>';
+                return;
+            }
+
+            csvFiles.sort((a, b) => a.name.localeCompare(b.name));
+
+            container.innerHTML = '';
+            csvFiles.forEach((file, index) => {
+                const btn = document.createElement('button');
+                btn.className = `tab-btn ${index === 0 ? 'active' : ''}`;
+                btn.innerText = formatNamaTab(file.name);
+                
+                btn.onclick = () => {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    muatData(file.download_url); 
+                    btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                };
+                
+                container.appendChild(btn);
+            });
+
+            // Otomatis muat file CSV pertama
+            muatData(csvFiles[0].download_url);
+
+        } catch (error) {
+            console.error(error);
+            container.innerHTML = '';
+            pesanError.innerHTML = `<div class="error-msg">
+                <strong>Gagal Memindai Folder Data</strong><br>
+                ${error.message}
+            </div>`;
+        }
+    }
+
+    // Jalankan saat halaman selesai dimuat
+    document.addEventListener('DOMContentLoaded', pindaiFolderData);
 </script>
 
 </body>
